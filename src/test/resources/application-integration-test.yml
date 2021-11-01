@@ -1,0 +1,6 @@
+spring:
+  config:
+    import: classpath:application.yml
+
+  cloud.stream:
+    function.definition: anyStatusChangedConsumer;
