@@ -1,0 +1,11 @@
+spring:
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+  cloud.stream:
+    function.definition: anyStatusChangedConsumer;
+    default:
+      group: ${spring.application.name}
+
+    bindings:
+      anyStatusChangedConsumer-in-0.destination: any-status-changed

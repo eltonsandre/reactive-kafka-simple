@@ -6,11 +6,18 @@ server:
 logging:
   level:
     root: INFO
-    org.springframework.web: WARN
+    org.springframework: WARN
+    org.springframework.cloud.function: DEBUG
+    org.springframework.kafka.listener: INFO
 
 spring:
-  application:
-    name: reactive-kafka-simple
+  application.name: reactive-kafka-simple
+
+  sleuth:
+    reactor.enabled: true
+    kafka.enabled: true
+    integration.enabled: true
+    sampler.probability: 1.0
 
   cloud:
     stream:
@@ -19,18 +26,27 @@ spring:
       default:
         group: ${spring.application.name}-stream
         consumer:
-          concurrency: 10
           max-attempts: 3
           partitioned: true
 
       bindings:
         anyStatusChangedConsumer-in-0:
           destination: any-status-changed
+
         otherAnyStatusChangedConsumer-in-0:
           destination: tmp-test
 
       kafka:
         binder:
+          headers: #X-B3-TraceId,X-B3-SpanId,B3-Sampled,X-B3-ParentSpanId,X-Span-Name,X-Span-Export
+            - traceId
+            - spanId
+            - spanSampled
+            - spanProcessId
+            - spanParentSpanId
+            - spanTraceId
+            - spanName
+            - spanFlags
           brokers:
             - localhost:9092
           consumer-properties:
