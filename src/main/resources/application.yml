@@ -1,0 +1,38 @@
+server:
+  port: 8082
+  shutdown: graceful
+  http2.enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: WARN
+
+spring:
+  application:
+    name: reactive-kafka-simple
+
+  cloud:
+    stream:
+      function:
+        definition: anyStatusChangedConsumer;otherAnyStatusChangedConsumer
+      default:
+        group: ${spring.application.name}-stream
+        consumer:
+          concurrency: 10
+          max-attempts: 3
+          partitioned: true
+
+      bindings:
+        anyStatusChangedConsumer-in-0:
+          destination: any-status-changed
+        otherAnyStatusChangedConsumer-in-0:
+          destination: tmp-test
+
+      kafka:
+        binder:
+          brokers:
+            - localhost:9092
+          consumer-properties:
+            client.id: ${spring.application.name}
+            group.id: ${spring.application.name}
