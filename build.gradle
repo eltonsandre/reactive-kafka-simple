@@ -1,19 +1,17 @@
 plugins {
-    id 'org.springframework.boot' version '2.4.12'
-    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
     id 'java'
+    id 'idea'
+    id 'org.springframework.boot' version '2.7.8'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+
+    id 'com.google.cloud.tools.jib' version '3.3.1'
 }
 
 group = 'com.github.eltonsandre.simple'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '11'
 
-compileJava.options.encoding = 'UTF-8'
-compileTestJava.options.encoding = 'UTF-8'
-
-compileJava.options.compilerArgs = ['-parameters', '-Amapstruct.defaultComponentModel=spring']
-compileTestJava.options.compilerArgs = ['-parameters', '-Amapstruct.defaultComponentModel=spring']
-compileJava.dependsOn(processResources)
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = sourceCompatibility
 
 configurations {
     compileOnly {
@@ -26,37 +24,111 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2020.0.4")
+    set('encoding', 'UTF-8')
+
+    set('springBootVersion', '2.7.8')
+    set('springCloudVersion', '2021.0.5')
+    set('testcontainersVersion', '1.17.6')
+
+    set('mapstructVersion', '1.5.3.Final')
+    set('lombokMapstructBinding', '0.2.0')
 }
 
 dependencies {
-    compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-    annotationProcessor 'org.projectlombok:lombok'
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor',
+            "org.mapstruct:mapstruct-processor:$mapstructVersion",
+            "org.projectlombok:lombok-mapstruct-binding:$lombokMapstructBinding"
+
+    ['annotationProcessor', 'compileOnly', 'testAnnotationProcessor', 'testCompileOnly']
+            .each { conf -> add(conf, 'org.projectlombok:lombok') }
+
+    implementation "org.mapstruct:mapstruct:$mapstructVersion"
 
     implementation 'org.springframework.boot:spring-boot-starter-webflux',
-            'org.springframework.cloud:spring-cloud-stream',
+            'org.springframework.cloud:spring-cloud-starter-sleuth',
 
-            'org.apache.kafka:kafka-streams',
             'org.springframework.kafka:spring-kafka',
+            'org.springframework.cloud:spring-cloud-stream',
             'org.springframework.cloud:spring-cloud-stream-binder-kafka',
-
+            'org.apache.kafka:kafka-streams',
             'io.projectreactor.kafka:reactor-kafka',
-            'io.projectreactor.addons:reactor-extra'
+            'io.projectreactor.addons:reactor-extra',
+
+            'org.apache.commons:commons-lang3:3.12.0'
 
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'io.projectreactor:reactor-test'
-    testImplementation 'org.springframework.kafka:spring-kafka-test'
+//    implementation 'io.projectreactor.tools:blockhound:1.0.7.RELEASE'
+
+//    testImplementation 'io.projectreactor.tools:blockhound-junit-platform:1.0.7.RELEASE'
+
+    testImplementation 'io.projectreactor:reactor-test',
+            'org.springframework.boot:spring-boot-starter-test',
+            'org.springframework.kafka:spring-kafka-test',
+            'org.testcontainers:junit-jupiter',
+            'org.testcontainers:kafka',
+
+            'net.datafaker:datafaker:1.7.0'
+
 }
 
 dependencyManagement {
     imports {
-        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:$springCloudVersion"
+        mavenBom "org.testcontainers:testcontainers-bom:$testcontainersVersion"
     }
+}
+
+
+compileTestJava.options.encoding = 'UTF-8'
+
+compileJava {
+    options.setFork(true)
+    options.setEncoding('UTF-8')
+    options.compilerArgs += ['-parameters', '-Amapstruct.defaultComponentModel=spring', '-Xlint:unchecked', '-Xlint:deprecation']
+
+    dependsOn(processResources)
+}
+
+springBoot {
+    mainClass = "${project.group}.reactivekafka.Application"
+    buildInfo()
+}
+
+jar {
+    enabled = false
 }
 
 test {
     useJUnitPlatform()
+    setFailFast(Properties.getProperties().getOrDefault("test.fail-fast", false) as boolean)
+    testLogging.setShowExceptions(true)
+    testLogging.setShowStackTraces(true)
+    dependsOn 'clean'
+}
+
+wrapper() {
+    gradleVersion = '7.5.1'
+    distributionUrl = distributionUrl.replace('bin', 'all')
+}
+
+jib {
+    from {
+        image = 'paketobuildpacks/builder:tiny'
+    }
+    container {
+        labels.put('maintainer', 'eltonsandre')
+        labels.put('name', project.name)
+        labels.put('group', project.group.toString())
+        labels.put('namespace', project.group.toString())
+
+        environment = Map.of('TZ', 'America/Sao_Paulo')
+
+        jvmFlags = ['-noverify', '-XX:TieredStopAtLevel=1',
+                    '-Djava.security.egd=file:/dev/./urandom', '-Dfile.encoding=UTF-8',
+                    '-Duser.country=BR', '-Duser.language=pt', '-Duser.timezone=America/Sao_Paulo']
+
+        ports = ['8080']
+    }
 }
